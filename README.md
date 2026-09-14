@@ -42,9 +42,9 @@ Running `python main.py` opens a window with your mirrored webcam feed. A green 
 drawn around the detected hand and the predicted letter and confidence are shown in the
 corner, e.g. `a (98.3%)`, updating in real time as you sign.
 
-![Real-time ASL detection demo](assets/demo.png)
 
-> To include the screenshot above, add your own capture at `assets/demo.png`.
+https://github.com/user-attachments/assets/df61e15b-c024-455c-a6dd-64cd29567748
+
 
 **Note:** `J` and `Z` are drawn with motion in ASL. Since prediction runs on single
 static frames, those two letters are inherently unreliable here — this is a limitation
