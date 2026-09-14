@@ -2,41 +2,73 @@
 
 ## Goal
 
-Take a Convolutional Neural Network that was trained on Kaggle for American Sign
-Language (ASL) recognition and run it locally as a live inference tool. Instead of
-classifying static images from a dataset, this project points a webcam at your hand
-and predicts the ASL letter being signed in real time.
+Point a webcam at your hand and predict the American Sign Language (ASL) letter or
+digit being signed, live. Training happens on Kaggle; this repository is the local
+real-time inference tool.
 
-## What this codebase does
+## Approach
 
-The trained model is loaded from `models/asl_cnn.pth` and used purely for inference —
-no training happens here. The CNN is a simple three-block convolutional network
-(defined in `src/model.py`): three convolution + max-pool + ReLU stages that reduce a
-128×128 RGB image down to a set of feature maps, which are then flattened and passed
-through two fully connected layers to produce a score for each ASL class.
+An earlier version fed the cropped webcam image into a CNN trained on the
+[ASL dataset](https://www.kaggle.com/datasets/ayuraj/asl-dataset). It scored ~91% on
+the dataset's own test split but failed on a real webcam — different lighting,
+background, and hand meant the input was nothing like the clean training images, so it
+collapsed to a single class.
 
-At a high level, the pipeline works like this:
+This version classifies **hand landmarks instead of pixels**. MediaPipe first detects
+the hand and returns 21 keypoints; only those coordinates are fed to the model. Because
+the background, lighting, and skin tone never enter the input, the classifier is robust
+to the exact conditions that broke the image CNN.
 
-1. **Capture** — grab frames from the webcam continuously.
-2. **Preprocess** — crop/resize each frame to the 128×128 RGB format the model expects
-   and normalize it the same way the training data was normalized, so the input matches
-   what the model saw during training on Kaggle.
-3. **Predict** — feed the prepared frame into the loaded CNN, take the class with the
-   highest score, and map it back to its ASL letter.
-4. **Display** — show the live camera feed with the predicted letter overlaid, updating
-   frame by frame.
+## How it works
 
-The result is a running window where you sign a letter with your hand and the model
-tells you which letter it thinks you're showing, live.
+1. **Capture** — grab frames from the webcam continuously (`src/camera.py`).
+2. **Detect** — MediaPipe HandLandmarker locates the hand and returns 21 landmarks,
+   each with `(x, y, z)` (`src/hand_detector.py`).
+3. **Normalize** — the 21 landmarks are converted to a 63-value vector, translated so
+   the wrist is the origin and scaled by hand size, making the features invariant to
+   where the hand is and how big it appears (`src/landmark_utils.py`). This is the
+   *exact* normalization used during training.
+4. **Predict** — a small MLP (63 → 128 → 64 → 36) maps the landmark vector to an ASL
+   class (`src/model.py`, `src/predict.py`).
+5. **Display** — the live feed is shown with a bounding box and the predicted letter
+   overlaid, updating frame by frame.
+
+The landmark model reaches ~97% validation accuracy and, unlike the image CNN, actually
+responds to hand shape on a live webcam.
+
+## Output
+
+Running `python main.py` opens a window with your mirrored webcam feed. A green box is
+drawn around the detected hand and the predicted letter and confidence are shown in the
+corner, e.g. `a (98.3%)`, updating in real time as you sign.
+
+![Real-time ASL detection demo](assets/demo.png)
+
+> To include the screenshot above, add your own capture at `assets/demo.png`.
+
+**Note:** `J` and `Z` are drawn with motion in ASL. Since prediction runs on single
+static frames, those two letters are inherently unreliable here — this is a limitation
+of static-frame classification, not a bug.
 
 ## Requirements
 
-- Python
-- PyTorch / torchvision (for the model and image transforms)
-- OpenCV (for webcam capture and displaying the live feed)
+- Python 3
 - A webcam
+- Dependencies in `requirements.txt` (PyTorch, NumPy, OpenCV, MediaPipe, scikit-learn)
+
+## Running
+
+```bash
+pip install -r requirements.txt
+python main.py
+```
+
+Press `q` to quit.
+
+The model weights (`models/asl_landmark_mlp.pth`) and label encoder
+(`landmark_label_encoder.pkl`) are loaded at startup — no training happens locally.
 
 ## Related
 
-The training experiments and other deep learning work live in my notebooks repo:
+Training experiments and other deep learning work live in my notebooks repo:
 [deep_learning-notebooks](https://github.com/ronronrivera/deep_learning-notebooks)

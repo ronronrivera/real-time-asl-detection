@@ -2,13 +2,14 @@ import cv2
 import numpy as np
 
 
-from .predict import ASLPredictor
+from .predict import LandmarkPredictor
 from .hand_detector import HandDetector
+from .landmark_utils import landmarks_to_features
 
 
 def run_camera():
 
-    predictor = ASLPredictor()
+    predictor = LandmarkPredictor()
     detector = HandDetector()
     camera = cv2.VideoCapture(0)
     
@@ -63,17 +64,10 @@ def run_camera():
             y_min = max(0, y_min - padding)
             y_max = min(h, y_max + padding)
 
-            # Crop
-            hand_crop = frame[y_min:y_max, x_min:x_max]
+            # normalize landmarks the same way as training, then predict
+            features = landmarks_to_features(hand)
 
-            # BGR -> RGB
-            rgb = cv2.cvtColor(
-                hand_crop,
-                cv2.COLOR_BGR2RGB
-            )
-
-            # CNN prediction (transform's ToPILImage handles the numpy array)
-            label, confidence = predictor.predict(rgb)
+            label, confidence = predictor.predict(features)
 
             label = label[0]
             confidence = confidence.item()

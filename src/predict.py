@@ -2,34 +2,29 @@ import torch
 import pickle
 from pathlib import Path
 
-from .model import Net
-from .preprocessing import transform
+from .model import LandmarkMLP
 
 ROOT = Path(__file__).resolve().parent.parent  # src/ -> project root
 
-class ASLPredictor:
 
-    def __init__(self, model_path = ROOT / 'models' / 'asl_cnn.pth',
-                 label_encoder_path = ROOT / 'label_encoder.pkl' ):
-       
+class LandmarkPredictor:
+
+    def __init__(self, model_path = ROOT / 'models' / 'asl_landmark_mlp.pth',
+                 label_encoder_path = ROOT / 'landmark_label_encoder.pkl'):
+
         self.device = torch.device(
-                'cuda' if torch.cuda.is_available() else 'cpu'
-            )
+            'cuda' if torch.cuda.is_available() else 'cpu'
+        )
 
         #load label encoder
-        if label_encoder_path == None:
-            print("Invalid Label Encoder")
-            exit()
-
         with open(label_encoder_path, 'rb') as f:
             self.label_encoder = pickle.load(f)
 
-        #create model
-        self.model = Net(
+        #create model and load trained parameters
+        self.model = LandmarkMLP(
             len(self.label_encoder.classes_)
         )
 
-        #Load trained parameters
         self.model.load_state_dict(
             torch.load(
                 model_path,
@@ -42,17 +37,17 @@ class ASLPredictor:
         #eval mode
         self.model.eval()
 
-    def predict(self, image):
+    def predict(self, features):
 
-        #OpenCV gives us numpy array
-        #but this func expects a PIL image
-
-        image = transform(image)
+        #features: normalized (63,) numpy array from landmarks_to_features
+        image = torch.tensor(
+            features,
+            dtype=torch.float32
+        )
 
         #add batch dimension
         image = image.unsqueeze(0)
 
-        #Move cpu to gpu
         image = image.to(self.device)
 
         #inference
@@ -71,7 +66,6 @@ class ASLPredictor:
             )
 
         #convert class index -> label
-
         label = self.label_encoder.inverse_transform(
             prediction.cpu().numpy()
         )
